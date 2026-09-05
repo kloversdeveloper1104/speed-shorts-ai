@@ -84,7 +84,7 @@ jobs:
           DATABASE_URL: "file:./dev.db"
           AUTO_MODE: FULL
           AUTO_UPLOAD: "true"
-          QUALITY_THRESHOLD: "85"
+          QUALITY_THRESHOLD: "80"
         run: npm run ci-run
 
       - name: 変更(投稿履歴DB)をコミットして永続化
