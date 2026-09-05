@@ -32,6 +32,7 @@ export interface PipelineResult {
   scriptId?: string;
   videoId?: string;
   qualityScore?: number;
+  criticalIssues?: string[];
   passed: boolean;
   uploaded: boolean;
   youtubeVideoId?: string;
@@ -78,6 +79,7 @@ export async function generateTestVideo(): Promise<PipelineResult> {
       scriptId: script.id,
       videoId: video.id,
       qualityScore: quality.score,
+      criticalIssues: quality.issues.filter((i) => i.severity === "critical").map((i) => i.description),
       passed: quality.passed,
       uploaded: false,
       stage: "DONE",
@@ -108,9 +110,12 @@ export async function runAutoCycle(options: AutoCycleOptions): Promise<PipelineR
   // Channel.qualityThreshold(DB)の方が優先されるQualityAgentの判定と食い違い、
   // 実質的にDBの値だけが効いて env 側の変更が無視される事故につながるため一本化する。
   if (!result.passed) {
+    const criticalNote = result.criticalIssues?.length
+      ? ` / 重大な懸念点: ${result.criticalIssues.join(" / ")}`
+      : "";
     await notify({
       title: "品質基準未達のため投稿を見送り",
-      message: `スコア${result.qualityScore}点`,
+      message: `スコア${result.qualityScore}点${criticalNote}`,
       level: "warning",
     });
     return result;
