@@ -1,6 +1,7 @@
 // UploadAgent: YouTubeへアップロードする(仕様書 24節)
 
-import { uploadVideo } from "@/youtube/client";
+import fs from "fs";
+import { uploadVideo, setVideoThumbnail } from "@/youtube/client";
 import { prisma } from "@/database/client";
 import { logError } from "@/utils/logger";
 import { notify } from "@/utils/notification";
@@ -56,6 +57,15 @@ export async function uploadVideoToYoutube(
     });
 
     await prisma.video.update({ where: { id: video.id }, data: { status: "UPLOADED" } });
+
+    if (result.id && video.thumbnailPath && fs.existsSync(video.thumbnailPath)) {
+      try {
+        await setVideoThumbnail(result.id, video.thumbnailPath);
+      } catch (thumbErr) {
+        // サムネイル設定の失敗は投稿自体を失敗扱いにしない
+        await logError("UploadAgent:Thumbnail", thumbErr, { videoId: video.id, youtubeVideoId: result.id });
+      }
+    }
 
     await notify({
       title: "動画投稿完了",

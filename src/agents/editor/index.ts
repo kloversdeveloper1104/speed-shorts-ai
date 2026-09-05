@@ -10,6 +10,7 @@ import { fetchStockPhoto, fetchStockVideo } from "@/video/pexels-client";
 import { burnSubtitles } from "@/video/subtitles";
 import { mixNarrationWithBgm } from "@/video/bgm";
 import { runFfmpeg, probeMedia } from "@/video/ffmpeg";
+import { generateThumbnail } from "@/video/thumbnail";
 import { getFullNarration } from "@/agents/script";
 import type { Script, Scene } from "@prisma/client";
 
@@ -135,10 +136,21 @@ export async function editVideoFromScript(script: Script & { scenes: Scene[] }):
 
     const probe = await probeMedia(finalPath);
 
+    // サムネイル生成(検索・関連動画欄でのCTR向上のため)。
+    // 字幕焼き込み前(silentVideoPath)のフレームを使うことで、既存の字幕テキストと
+    // サムネイル文言が二重に表示されるのを防ぐ。失敗しても動画生成自体は続行する。
+    let thumbnailPath: string | null = null;
+    try {
+      thumbnailPath = await generateThumbnail(silentVideoPath, script.hook, workDir);
+    } catch (err) {
+      await logError("EditorAgent:Thumbnail", err, { scriptId: script.id });
+    }
+
     await prisma.video.update({
       where: { id: video.id },
       data: {
         filePath: finalPath,
+        thumbnailPath,
         durationSec: probe.durationSec,
         width: probe.width ?? 1080,
         height: probe.height ?? 1920,

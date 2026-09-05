@@ -78,6 +78,15 @@ export async function uploadVideo(params: UploadVideoParams) {
   return res.data;
 }
 
+export async function setVideoThumbnail(videoId: string, thumbnailPath: string): Promise<void> {
+  const yt = getYoutube();
+  const fs = await import("fs");
+  await yt.thumbnails.set({
+    videoId,
+    media: { body: fs.createReadStream(thumbnailPath) },
+  });
+}
+
 export async function searchShorts(query: string, maxResults = 25) {
   const yt = getYoutube();
   const res = await yt.search.list({
