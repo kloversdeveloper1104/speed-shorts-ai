@@ -90,8 +90,10 @@ subtitle(字幕)、sfx(効果音)を指定してください。`;
       temperature: 0.9,
     });
 
-    const created = await prisma.script.create({
-      data: {
+    // リトライ時に同じideaIdで再実行されてもユニーク制約に落ちないようupsertする
+    const created = await prisma.script.upsert({
+      where: { ideaId: idea.id },
+      create: {
         ideaId: idea.id,
         title: script.title,
         duration: script.duration,
@@ -113,6 +115,7 @@ subtitle(字幕)、sfx(効果音)を指定してください。`;
           })),
         },
       },
+      update: {},
       include: { scenes: true },
     });
 
