@@ -1,0 +1,311 @@
+// YouTube Shorts AI 自動運用システム - データベーススキーマ
+// 開発: SQLite / 将来: PostgreSQLへ移行可能な設計
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== チャンネル ====================
+model Channel {
+  id                String   @id @default(cuid())
+  youtubeChannelId  String?  @unique
+  googleAccountEmail String  @default("kloversmovie@gmail.com")
+  title             String?
+  description       String?
+  subscriberCount   Int?     @default(0)
+  autoMode          String   @default("OFF") // OFF / SAFE / FULL
+  qualityThreshold  Int      @default(85)
+  maxPostsPerDay    Int      @default(1)
+  postTimes         String   @default("[\"12:00\",\"18:00\",\"20:00\",\"21:00\",\"22:00\"]") // JSON配列
+  targetCategories  String   @default("[]") // JSON配列
+  geminiModel       String?
+  voiceProvider     String   @default("edge-tts")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  videos    Video[]
+  strategies Strategy[]
+}
+
+// ==================== トレンド ====================
+model Trend {
+  id          String   @id @default(cuid())
+  keyword     String
+  category    String?
+  score       Float    @default(0)
+  source      String   @default("youtube") // youtube / manual
+  metadata    String?  // JSON
+  collectedAt DateTime @default(now())
+
+  sourceVideos SourceVideo[]
+}
+
+// ==================== 収集した参考動画(構造分析のみ・複製禁止) ====================
+model SourceVideo {
+  id                 String   @id @default(cuid())
+  trendId            String?
+  youtubeVideoId     String   @unique
+  title              String
+  channelTitle       String?
+  channelId          String?
+  publishedAt        DateTime?
+  viewCount          BigInt?  @default(0)
+  likeCount          BigInt?  @default(0)
+  commentCount       BigInt?  @default(0)
+  subscriberCount    BigInt?  @default(0)
+  durationSeconds    Int?
+  url                String
+  buzzScore          Float?   @default(0)
+  fetchedAt          DateTime @default(now())
+
+  trend    Trend?         @relation(fields: [trendId], references: [id])
+  analysis VideoAnalysis?
+}
+
+// ==================== バズ動画のGemini構造分析結果 ====================
+model VideoAnalysis {
+  id                 String   @id @default(cuid())
+  sourceVideoId      String   @unique
+  hook               String?
+  topic              String?
+  audience           String?
+  duration            Int?
+  structure           String?  // JSON配列
+  hookType             String?
+  narrationStyle       String?
+  subtitleStyle        String?
+  sceneChangeRate      Float?
+  emotionCurve         String?
+  endingType            String?
+  commentTrigger        String?
+  retentionStrategy     String?
+  whyItWorks            String?  // JSON配列
+  adaptationIdeas       String?  // JSON配列
+  originalityRisk       String?
+  rawJson                String?
+  analyzedAt            DateTime @default(now())
+
+  sourceVideo SourceVideo @relation(fields: [sourceVideoId], references: [id])
+}
+
+// ==================== 企画(IdeaAgent) ====================
+model Idea {
+  id                    String   @id @default(cuid())
+  title                 String
+  genre                 String?
+  targetAudience        String?  @default("30代男性")
+  hook                  String?
+  summary               String?
+  buzzScore             Float?   @default(0)
+  originalityScore      Float?   @default(0)
+  productionDifficulty  String?  // 低 / 中 / 高
+  expectedRetention     Float?
+  scoreTotal            Float?   @default(0)
+  scoreBreakdown        String?  // JSON: targetFit, hook, novelty, infoValue, comment, visual, originality
+  status                String   @default("PENDING") // PENDING / APPROVED / REJECTED / PRODUCED
+  sourceAnalysisIds     String?  // JSON配列 (参考にした構造分析のID)
+  createdAt             DateTime @default(now())
+
+  script Script?
+}
+
+// ==================== 台本(ScriptAgent) ====================
+model Script {
+  id          String   @id @default(cuid())
+  ideaId      String   @unique
+  title       String
+  duration    Int      @default(45)
+  hook        String
+  ending      String?
+  description String?
+  hashtags    String?  // JSON配列
+  keywords    String?  // JSON配列
+  rawJson     String?
+  createdAt   DateTime @default(now())
+
+  idea   Idea     @relation(fields: [ideaId], references: [id])
+  scenes Scene[]
+  video  Video?
+}
+
+// ==================== シーン ====================
+model Scene {
+  id         String  @id @default(cuid())
+  scriptId   String
+  order      Int
+  startSec   Float
+  endSec     Float
+  visual     String?
+  narration  String?
+  subtitle   String?
+  sfx        String?
+  visualPrompt String?
+
+  script Script  @relation(fields: [scriptId], references: [id])
+  assets Asset[]
+}
+
+// ==================== 映像・画像アセット ====================
+model Asset {
+  id        String   @id @default(cuid())
+  sceneId   String
+  type      String   // image / video / motion_graphic / text_animation
+  provider  String?
+  filePath  String?
+  prompt    String?
+  status    String   @default("PENDING") // PENDING / GENERATING / DONE / FAILED
+  createdAt DateTime @default(now())
+
+  scene Scene @relation(fields: [sceneId], references: [id])
+}
+
+// ==================== ナレーション音声 ====================
+model Voice {
+  id           String   @id @default(cuid())
+  videoId      String
+  provider     String
+  filePath     String?
+  durationSec  Float?
+  subtitlesJson String? // [{start,end,text,emphasis}]
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id])
+}
+
+// ==================== 完成動画 ====================
+model Video {
+  id               String   @id @default(cuid())
+  channelId        String
+  scriptId         String   @unique
+  filePath         String?
+  thumbnailPath    String?
+  durationSec      Float?
+  width            Int      @default(1080)
+  height           Int      @default(1920)
+  fps              Int      @default(30)
+  status           String   @default("DRAFT") // DRAFT / EDITING / REVIEW / QUALITY_CHECK / SCHEDULED / UPLOADED / FAILED
+  qualityScore     Float?
+  qualityChecklist String?  // JSON
+  qualityIssues    String?  // JSON配列
+  duplicateOf      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  channel Channel  @relation(fields: [channelId], references: [id])
+  script  Script   @relation(fields: [scriptId], references: [id])
+  voices  Voice[]
+  upload  Upload?
+  analytics Analytics[]
+  experiments Experiment[]
+}
+
+// ==================== YouTube投稿 ====================
+model Upload {
+  id             String    @id @default(cuid())
+  videoId        String    @unique
+  youtubeVideoId String?
+  title          String
+  description    String?
+  tags           String?   // JSON配列
+  privacyStatus  String    @default("private") // private / unlisted / public
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  status         String    @default("PENDING") // PENDING / UPLOADING / UPLOADED / FAILED
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+
+  video Video @relation(fields: [videoId], references: [id])
+}
+
+// ==================== Analytics ====================
+model Analytics {
+  id                 String   @id @default(cuid())
+  videoId            String
+  measuredAt         DateTime @default(now())
+  windowLabel        String?  // 24h / 48h / 72h / 7d
+  views              BigInt?  @default(0)
+  likes              BigInt?  @default(0)
+  comments           BigInt?  @default(0)
+  shares             BigInt?  @default(0)
+  averageViewDuration Float?
+  averageViewPercentage Float?
+  subscribersGained  Int?     @default(0)
+  impressions        BigInt?
+  ctr                Float?
+  hookScore          Float?
+  retentionScore     Float?
+  topicScore         Float?
+  titleScore         Float?
+  endingScore        Float?
+  commentScore       Float?
+  conversionScore    Float?
+  grade              String?  // S/A/B/C/D
+  aiEvaluationJson   String?
+  improvementNotes   String?
+
+  video Video @relation(fields: [videoId], references: [id])
+}
+
+// ==================== 勝ちパターンDB(StrategyAgent) ====================
+model Strategy {
+  id                String   @id @default(cuid())
+  channelId         String
+  winningPatterns   String?  // JSON配列
+  losingPatterns    String?  // JSON配列
+  bestTopics        String?  // JSON配列
+  bestHooks         String?  // JSON配列
+  bestLength        String?
+  bestPostTime      String?
+  bestEnding        String?
+  bestCta           String?
+  rawAnalysis       String?
+  generatedAt       DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id])
+}
+
+// ==================== A/Bテスト等の実験 ====================
+model Experiment {
+  id          String   @id @default(cuid())
+  videoId     String?
+  type        String   // hook / title / length
+  variantA    String
+  variantB    String
+  winner      String?
+  status      String   @default("RUNNING") // RUNNING / DONE
+  createdAt   DateTime @default(now())
+
+  video Video? @relation(fields: [videoId], references: [id])
+}
+
+// ==================== ジョブシステム ====================
+model Job {
+  id         String    @id @default(cuid())
+  type       String    // TREND_COLLECT / VIRAL_ANALYZE / IDEA_GENERATE / SCRIPT_GENERATE / ASSET_GENERATE / VIDEO_EDIT / QUALITY_CHECK / UPLOAD / ANALYTICS
+  status     String    @default("PENDING") // PENDING / RUNNING / DONE / FAILED
+  payload    String?   // JSON
+  result     String?   // JSON
+  retryCount Int       @default(0)
+  maxRetries Int       @default(3)
+  errorMessage String?
+  scheduledAt DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// ==================== エラーログ ====================
+model ErrorLog {
+  id        String   @id @default(cuid())
+  source    String   // どのAgent/処理か
+  message   String
+  stack     String?
+  context   String?  // JSON
+  createdAt DateTime @default(now())
+}

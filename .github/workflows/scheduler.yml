@@ -1,0 +1,95 @@
+name: YouTube Shorts AI Scheduler
+
+on:
+  schedule:
+    # 全てUTC。JST = UTC+9
+    - cron: "0 21 * * *"  # 06:00 JST - トレンド収集
+    - cron: "0 22 * * *"  # 07:00 JST - バズ分析
+    - cron: "0 23 * * *"  # 08:00 JST - 企画生成
+    - cron: "30 14 * * *" # 23:30 JST - 戦略分析
+    - cron: "0 * * * *"   # 毎時0分 + 0〜15分ジッター - 投稿サイクル
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "実行するタスク"
+        required: true
+        default: "CYCLE"
+        type: choice
+        options:
+          - TREND
+          - VIRAL
+          - IDEA
+          - STRATEGY
+          - CYCLE
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scheduler
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: タスクを決定
+        id: task
+        run: |
+          if [ -n "${{ inputs.task }}" ]; then
+            echo "task=${{ inputs.task }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 21 * * *") echo "task=TREND" >> "$GITHUB_OUTPUT" ;;
+              "0 22 * * *") echo "task=VIRAL" >> "$GITHUB_OUTPUT" ;;
+              "0 23 * * *") echo "task=IDEA" >> "$GITHUB_OUTPUT" ;;
+              "30 14 * * *") echo "task=STRATEGY" >> "$GITHUB_OUTPUT" ;;
+              "0 * * * *") echo "task=CYCLE" >> "$GITHUB_OUTPUT" ;;
+              *) echo "task=CYCLE" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: FFmpegをインストール
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: 依存パッケージをインストール
+        run: npm ci
+
+      - name: Prisma Clientを生成
+        run: npx prisma generate
+
+      - name: マイグレーションを適用
+        env:
+          DATABASE_URL: "file:./dev.db"
+        run: npx prisma migrate deploy
+
+      - name: タスクを実行
+        env:
+          TASK: ${{ steps.task.outputs.task }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REDIRECT_URI: ${{ secrets.YOUTUBE_REDIRECT_URI }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.1-flash-lite
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          VOICE_PROVIDER: edge-tts
+          DATABASE_URL: "file:./dev.db"
+          AUTO_MODE: FULL
+          AUTO_UPLOAD: "true"
+          QUALITY_THRESHOLD: "85"
+        run: npm run ci-run
+
+      - name: 変更(投稿履歴DB・トークン)をコミットして永続化
+        run: |
+          git config user.name "youtube-shorts-ai-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add prisma/dev.db tokens/
+          git diff --cached --quiet || git commit -m "chore: update state [skip ci]"
+          git push

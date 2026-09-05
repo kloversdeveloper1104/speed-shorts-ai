@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+body {
+  font-family: "Yu Gothic UI", "Meiryo", "Hiragino Sans", system-ui, -apple-system, sans-serif;
+}
