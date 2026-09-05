@@ -13,8 +13,11 @@ dist/
 *.pem
 credentials/
 
-# GitHub Actions永続化用に tokens/ と prisma/dev.db は追跡する
-# (CI実行間でOAuthトークンと投稿履歴DBを引き継ぐため。リポジトリはprivate運用が前提)
+# OAuthトークン(暗号化キー含む)はリポジトリに絶対にコミットしない。
+# CIはYOUTUBE_REFRESH_TOKENシークレットから直接読むため、tokens/自体は追跡不要。
+tokens/
+
+# GitHub Actions永続化用にprisma/dev.dbのみ追跡する(投稿履歴DB。機密情報は含まない)
 prisma/dev.db-journal
 *.db
 !prisma/dev.db

@@ -76,6 +76,7 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REDIRECT_URI: ${{ secrets.YOUTUBE_REDIRECT_URI }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.1-flash-lite
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -86,10 +87,10 @@ jobs:
           QUALITY_THRESHOLD: "85"
         run: npm run ci-run
 
-      - name: 変更(投稿履歴DB・トークン)をコミットして永続化
+      - name: 変更(投稿履歴DB)をコミットして永続化
         run: |
           git config user.name "youtube-shorts-ai-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add prisma/dev.db tokens/
+          git add prisma/dev.db
           git diff --cached --quiet || git commit -m "chore: update state [skip ci]"
           git push
