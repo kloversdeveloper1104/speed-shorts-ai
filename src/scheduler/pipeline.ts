@@ -10,7 +10,6 @@ import { runQualityCheck } from "@/agents/quality";
 import { checkDuplicate, isSimilarTitle } from "@/agents/quality/duplicate";
 import { uploadVideoToYoutube } from "@/agents/upload";
 import { getRecentUploadedVideoTitles } from "@/youtube/client";
-import { getQualityThreshold } from "@/utils/env";
 import { notify } from "@/utils/notification";
 import { logError } from "@/utils/logger";
 import { withRetry } from "@/utils/retry";
@@ -97,18 +96,21 @@ export interface AutoCycleOptions {
 /** AUTOコマンドの1サイクル(仕様書54節) */
 export async function runAutoCycle(options: AutoCycleOptions): Promise<PipelineResult> {
   const result = await generateTestVideo();
-  if (!result.passed || !result.videoId || !result.scriptId) {
+  if (!result.videoId || !result.scriptId) {
     if (result.error) {
       await notify({ title: "動画生成失敗", message: `${result.stage}: ${result.error}`, level: "error" });
     }
     return result;
   }
 
-  const threshold = getQualityThreshold();
-  if ((result.qualityScore ?? 0) < threshold) {
+  // quality.passed (チャンネル別しきい値・重大な懸念点の有無を含む) が唯一の合否判定。
+  // ここで別途スコアのみを env の QUALITY_THRESHOLD と比較し直すと、
+  // Channel.qualityThreshold(DB)の方が優先されるQualityAgentの判定と食い違い、
+  // 実質的にDBの値だけが効いて env 側の変更が無視される事故につながるため一本化する。
+  if (!result.passed) {
     await notify({
-      title: "品質スコア未達のため投稿を見送り",
-      message: `スコア${result.qualityScore}点 (基準${threshold}点)`,
+      title: "品質基準未達のため投稿を見送り",
+      message: `スコア${result.qualityScore}点`,
       level: "warning",
     });
     return result;
