@@ -20,6 +20,27 @@ export async function getMyChannel() {
   return res.data.items?.[0] ?? null;
 }
 
+/**
+ * 実際のチャンネルに直近アップロードされた動画のタイトルを取得する。
+ * ローカルDBの状態(git履歴の巻き戻し等)に依存しない、投稿直前の最終重複チェック用。
+ */
+export async function getRecentUploadedVideoTitles(maxResults = 15): Promise<string[]> {
+  const yt = getYoutube();
+  const channel = await yt.channels.list({ part: ["contentDetails"], mine: true });
+  const uploadsPlaylistId = channel.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsPlaylistId) return [];
+
+  const items = await yt.playlistItems.list({
+    part: ["snippet"],
+    playlistId: uploadsPlaylistId,
+    maxResults,
+  });
+
+  return (items.data.items ?? [])
+    .map((item) => item.snippet?.title)
+    .filter((title): title is string => !!title);
+}
+
 export interface UploadVideoParams {
   filePath: string;
   title: string;

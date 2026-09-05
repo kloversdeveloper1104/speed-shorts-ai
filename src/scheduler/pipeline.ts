@@ -7,8 +7,9 @@ import { generateScript } from "@/agents/script";
 import { designAllScenes } from "@/agents/visual";
 import { editVideoFromScript } from "@/agents/editor";
 import { runQualityCheck } from "@/agents/quality";
-import { checkDuplicate } from "@/agents/quality/duplicate";
+import { checkDuplicate, isSimilarTitle } from "@/agents/quality/duplicate";
 import { uploadVideoToYoutube } from "@/agents/upload";
+import { getRecentUploadedVideoTitles } from "@/youtube/client";
 import { getQualityThreshold } from "@/utils/env";
 import { notify } from "@/utils/notification";
 import { logError } from "@/utils/logger";
@@ -132,6 +133,24 @@ export async function runAutoCycle(options: AutoCycleOptions): Promise<PipelineR
 
   if (!options.autoUpload) {
     return result; // SAFEモード: 人間の承認待ち
+  }
+
+  // ローカルDBの状態(git履歴の巻き戻し等)だけに頼らない最終防衛ライン:
+  // 実際のチャンネルの直近投稿タイトルとも突き合わせる。
+  try {
+    const liveTitles = await getRecentUploadedVideoTitles(15);
+    const liveDup = isSimilarTitle(script.title, liveTitles);
+    if (liveDup.isDuplicate) {
+      await notify({
+        title: "重複コンテンツを検出(実チャンネル比較)",
+        message: `類似度${(liveDup.similarity * 100).toFixed(0)}% (既存投稿:「${liveDup.mostSimilarTitle}」) のため投稿をスキップしました`,
+        level: "warning",
+      });
+      return { ...result, passed: false, error: "重複コンテンツ(実チャンネル比較)" };
+    }
+  } catch (err) {
+    // チャンネル取得に失敗してもアップロード自体は続行する(このチェックは追加の安全網であり必須ではない)
+    await logError("Pipeline:LiveDuplicateCheck", err, { scriptId: script.id });
   }
 
   const video = await prisma.video.findUniqueOrThrow({ where: { id: result.videoId } });
