@@ -67,6 +67,9 @@ async function saveSourceVideos(trendId: string, stats: youtube_v3.Schema$Video[
         likeCount: BigInt(v.statistics?.likeCount ?? 0),
         commentCount: BigInt(v.statistics?.commentCount ?? 0),
         buzzScore,
+        // 再検出時にfetchedAtを更新しないと、繰り返し検出される人気動画ほど
+        // getRecentTrendingTopics()の「直近48時間」フィルタから漏れてしまう
+        fetchedAt: new Date(),
       },
     });
     collected++;
