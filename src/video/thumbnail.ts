@@ -10,14 +10,21 @@ function escapeFilterPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:");
 }
 
-/** サムネイル用に短く改行する(最大3行まで) */
-function wrapForThumbnail(text: string, maxCharsPerLine = 10): string {
+/** サムネイル用に短く改行する(最大3行まで)。収まらない場合は末尾を「…」で示す */
+function wrapForThumbnail(text: string, maxCharsPerLine = 10, maxLines = 3): string {
   const chars = [...text];
+  const maxTotal = maxCharsPerLine * maxLines;
+  const truncated = chars.length > maxTotal;
+  const limited = truncated ? chars.slice(0, maxTotal - 1) : chars;
+
   const lines: string[] = [];
-  for (let i = 0; i < chars.length; i += maxCharsPerLine) {
-    lines.push(chars.slice(i, i + maxCharsPerLine).join(""));
+  for (let i = 0; i < limited.length; i += maxCharsPerLine) {
+    lines.push(limited.slice(i, i + maxCharsPerLine).join(""));
   }
-  return lines.slice(0, 3).join("\n");
+  if (truncated && lines.length > 0) {
+    lines[lines.length - 1] += "…";
+  }
+  return lines.join("\n");
 }
 
 /**
