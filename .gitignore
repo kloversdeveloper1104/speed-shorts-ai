@@ -30,6 +30,11 @@ storage/completed/*
 storage/uploaded/*
 !storage/**/.gitkeep
 
+# 例外: Content ID収益化対応BGM(TuneCore Creators/BGM LIBRARY由来)はCIでも
+# 使う必要があるため追跡する(src/video/bgm.ts参照)
+!storage/assets/bgm/
+!storage/assets/bgm/*
+
 # Logs
 logs/*
 !logs/.gitkeep
