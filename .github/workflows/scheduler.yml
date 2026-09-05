@@ -55,6 +55,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+
+      - name: apt archiveをキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-ffmpeg-${{ runner.os }}-v1
 
       - name: FFmpegをインストール
         run: sudo apt-get update && sudo apt-get install -y ffmpeg

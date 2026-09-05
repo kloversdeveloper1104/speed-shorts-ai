@@ -72,6 +72,8 @@ const SYSTEM_INSTRUCTION = `あなたはYouTube Shortsチャンネル「スピ�
 - 実在の配信者・YouTuber個人の映像やエピソードを題材にしないこと(オリジナル企画のみ)
 - 各企画は0-100のスコアを score_breakdown の各項目に付けること
 - 誇大・虚偽・危険な内容は生成しないこと
+- titleとhookは、summaryで説明する実際の内容から誇張・逸脱しないこと(内容が伴わない
+  釣りタイトルは禁止)
 - 出力は日本語`;
 
 export interface GeneratedIdea {
