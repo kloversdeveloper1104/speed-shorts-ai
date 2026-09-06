@@ -100,7 +100,7 @@ export async function generateDailyIdeas(count = 10): Promise<GeneratedIdea[]> {
     .join("\n");
 
   const strategyHints = recentStrategy
-    ? `過去の勝ちパターン: ${recentStrategy.winningPatterns}\n避けるべきパターン: ${recentStrategy.losingPatterns}\nベストな尺: ${recentStrategy.bestLength}\nベストなフック: ${recentStrategy.bestHooks}`
+    ? `過去の勝ちパターン: ${recentStrategy.winningPatterns}\n避けるべきパターン: ${recentStrategy.losingPatterns}\n実績が良いトピック: ${recentStrategy.bestTopics}\nベストな尺: ${recentStrategy.bestLength}\nベストなフック: ${recentStrategy.bestHooks}\nベストなオチ: ${recentStrategy.bestEnding}`
     : "まだ十分なデータが蓄積されていません。初期カテゴリから幅広く企画してください。";
 
   const trendingTopics = await getRecentTrendingTopics(15);
@@ -131,6 +131,9 @@ ${initialCategories.join(" / ")}
 企画の一部(3〜5個)は、上記の急上昇テーマで使われているキーワードや話題の切り口を、
 「スピード・速さ」テーマに翻案したものにしてください。ただし文章・タイトル・構成の丸写しは厳禁です。
 残りは通常通り幅広いカテゴリから発想してください。
+「このチャンネルの学習結果」に実績データ(再生数等)に基づく「実績が良いトピック」がある場合は、
+それは推測ではなく実際にこのチャンネルで再生数が突出して伸びた実績のあるジャンルです。
+必ずそのうち2〜3個は、そのトピックの切り口(ただし具体的な題材は毎回変えること)で企画してください。
 各企画には score_breakdown (0-100) を必ず付けてください。`;
 
   try {
